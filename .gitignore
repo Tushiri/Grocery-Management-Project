@@ -1,0 +1,38 @@
+# --- Node / Next.js (web/) ---
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Python / FastAPI (ai-service/) ---
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Env / secrets (never commit real values) ---
+.env
+.env.local
+.env.*.local
+!*.env.example
+
+# --- Supabase CLI local state ---
+supabase/.branches/
+supabase/.temp/
+
+# --- OS / editor ---
+.DS_Store
+.vscode/
+.idea/

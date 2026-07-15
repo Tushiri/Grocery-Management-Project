@@ -1,0 +1,5 @@
+packages:
+  - "web"
+
+# ai-service/ is a Python (uv) project and is intentionally excluded from the
+# pnpm workspace — it is managed independently via ai-service/pyproject.toml.

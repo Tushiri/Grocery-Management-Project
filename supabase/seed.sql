@@ -1,0 +1,5 @@
+-- Local development seed data for G-rocery.
+-- Intentionally empty for Phase 0/1 (schema-only scaffolding).
+-- Populate with sample households/inventory_items/product_mapping rows
+-- once Phase 2 (auth) and Phase 3 (inventory CRUD) land, so local `supabase
+-- start` gives a non-empty dev environment out of the box.

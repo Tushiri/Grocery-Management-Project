@@ -1,0 +1,11 @@
+{
+  "name": "g-rocery",
+  "private": true,
+  "version": "0.1.0",
+  "description": "G-rocery: Smart Inventory & Procurement System — monorepo root (pnpm workspace).",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "pnpm --filter web build"
+  }
+}

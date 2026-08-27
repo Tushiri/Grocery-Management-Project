@@ -9,6 +9,11 @@ from uuid import UUID
 import pytest
 
 from app.schemas.receipt import ApproveReceiptRequest, ReceiptLineItem
+from app.domain.exceptions import (
+    InvalidReceiptMetadataError,
+    InvalidReceiptStateError,
+    ReceiptNotFoundError,
+)
 from app.services.reconciliation_service import (
     _to_buy_status,
     apply_line_item,
@@ -204,7 +209,7 @@ async def test_approve_receipt_raises_when_receipt_not_pending() -> None:
         "status": "APPROVED",
     }
 
-    with pytest.raises(ValueError, match="not pending"):
+    with pytest.raises(InvalidReceiptStateError, match="not pending"):
         await approve_receipt(
             RECEIPT_ID,
             ApproveReceiptRequest(line_items=[_line(1.0)]),
@@ -217,7 +222,7 @@ async def test_approve_receipt_raises_when_receipt_missing() -> None:
     supabase = MagicMock()
     supabase.get_pending_receipt.return_value = None
 
-    with pytest.raises(ValueError, match="not found"):
+    with pytest.raises(ReceiptNotFoundError, match="not found"):
         await approve_receipt(
             RECEIPT_ID,
             ApproveReceiptRequest(line_items=[_line(1.0)]),
@@ -248,7 +253,7 @@ async def test_approve_receipt_raises_when_household_id_missing() -> None:
         "status": "PENDING",
     }
 
-    with pytest.raises(ValueError, match="household_id"):
+    with pytest.raises(InvalidReceiptMetadataError, match="household_id"):
         await approve_receipt(
             RECEIPT_ID,
             ApproveReceiptRequest(line_items=[_line(1.0)]),
@@ -261,7 +266,7 @@ async def test_reject_receipt_raises_when_receipt_missing() -> None:
     supabase = MagicMock()
     supabase.get_pending_receipt.return_value = None
 
-    with pytest.raises(ValueError, match="not found"):
+    with pytest.raises(ReceiptNotFoundError, match="not found"):
         await reject_receipt(RECEIPT_ID, supabase=supabase)
 
 
@@ -393,3 +398,34 @@ async def test_approve_receipt_uses_today_when_parsed_date_is_not_string() -> No
         "Test Store",
         date.today(),
     )
+
+
+@pytest.mark.asyncio
+async def test_reject_receipt_raises_when_receipt_not_pending() -> None:
+    supabase = MagicMock()
+    supabase.get_pending_receipt.return_value = {
+        "id": str(RECEIPT_ID),
+        "status": "APPROVED",
+    }
+
+    with pytest.raises(InvalidReceiptStateError, match="not pending"):
+        await reject_receipt(RECEIPT_ID, supabase=supabase)
+
+
+@pytest.mark.asyncio
+async def test_approve_receipt_raises_when_date_purchased_is_invalid() -> None:
+    supabase = MagicMock()
+    supabase.get_pending_receipt.return_value = {
+        "id": str(RECEIPT_ID),
+        "household_id": str(HOUSEHOLD_ID),
+        "status": "PENDING",
+        "store_name": "Store",
+        "parsed_json": {"date_purchased": "not-a-date"},
+    }
+
+    with pytest.raises(InvalidReceiptMetadataError, match="Invalid date"):
+        await approve_receipt(
+            RECEIPT_ID,
+            ApproveReceiptRequest(line_items=[_line(1.0)]),
+            supabase=supabase,
+        )

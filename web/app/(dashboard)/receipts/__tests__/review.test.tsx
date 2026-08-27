@@ -169,4 +169,44 @@ describe("ReceiptReviewForm", () => {
       expect(screen.getByRole("alert")).toHaveTextContent("Approval failed");
     });
   });
+
+  it("resets submitting state when fetch throws", async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error("Network down"));
+    const { ReceiptReviewForm } = await import("@/components/receipts/ReceiptReviewForm");
+    const user = userEvent.setup();
+    render(
+      <ReceiptReviewForm
+        pendingReceiptId={RECEIPT_ID}
+        parsed={parsedReceipt}
+        status="PENDING"
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /approve receipt/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Network down");
+    });
+    expect(screen.getByRole("button", { name: /approve receipt/i })).toBeEnabled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("shows fallback error when a non-Error is thrown", async () => {
+    vi.mocked(fetch).mockRejectedValue("broken");
+    const { ReceiptReviewForm } = await import("@/components/receipts/ReceiptReviewForm");
+    const user = userEvent.setup();
+    render(
+      <ReceiptReviewForm
+        pendingReceiptId={RECEIPT_ID}
+        parsed={parsedReceipt}
+        status="PENDING"
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /approve receipt/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Approval failed unexpectedly.");
+    });
+  });
 });

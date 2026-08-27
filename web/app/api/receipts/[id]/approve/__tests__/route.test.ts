@@ -13,6 +13,19 @@ vi.mock("@/lib/ai-service-client", () => ({
 
 const RECEIPT_ID = "receipt-22222222-2222-2222-2222-222222222222";
 
+const validLineItems = [
+  {
+    raw_text: "MILK",
+    standardized_name: "Milk",
+    quantity: 1,
+    unit_price: 3,
+    total_price: 3,
+    category: null,
+    matched_item_id: "item-1",
+    matched_via: "lookup" as const,
+  },
+];
+
 describe("POST /api/receipts/[id]/approve", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,6 +118,74 @@ describe("POST /api/receipts/[id]/approve", () => {
     expect(response.status).toBe(400);
   });
 
+  it("returns 400 for malformed JSON body", async () => {
+    const mockMaybeSingle = vi.fn().mockResolvedValue({
+      data: { id: RECEIPT_ID, status: "PENDING" },
+      error: null,
+    });
+    mockSupabaseServer.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "user-1" } },
+          error: null,
+        }),
+      },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: mockMaybeSingle,
+          }),
+        }),
+      }),
+    });
+
+    const { POST } = await import("../route");
+    const response = await POST(
+      new Request("http://localhost/api/receipts/x/approve", {
+        method: "POST",
+        body: "{ not-json",
+      }),
+      { params: Promise.resolve({ id: RECEIPT_ID }) }
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 400 when line_items is empty on pending receipt", async () => {
+    const mockMaybeSingle = vi.fn().mockResolvedValue({
+      data: { id: RECEIPT_ID, status: "PENDING" },
+      error: null,
+    });
+    mockSupabaseServer.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "user-1" } },
+          error: null,
+        }),
+      },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: mockMaybeSingle,
+          }),
+        }),
+      }),
+    });
+
+    const { POST } = await import("../route");
+    const response = await POST(
+      new Request("http://localhost/api/receipts/x/approve", {
+        method: "POST",
+        body: JSON.stringify({ line_items: [] }),
+      }),
+      { params: Promise.resolve({ id: RECEIPT_ID }) }
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/non-empty array/);
+  });
+
   it("returns 502 when AI service fails", async () => {
     const mockMaybeSingle = vi.fn().mockResolvedValue({
       data: { id: RECEIPT_ID, status: "PENDING" },
@@ -131,7 +212,7 @@ describe("POST /api/receipts/[id]/approve", () => {
     const response = await POST(
       new Request("http://localhost/api/receipts/x/approve", {
         method: "POST",
-        body: JSON.stringify({ line_items: [] }),
+        body: JSON.stringify({ line_items: validLineItems }),
       }),
       { params: Promise.resolve({ id: RECEIPT_ID }) }
     );
@@ -167,7 +248,7 @@ describe("POST /api/receipts/[id]/approve", () => {
     const response = await POST(
       new Request("http://localhost/api/receipts/x/approve", {
         method: "POST",
-        body: JSON.stringify({ line_items: [] }),
+        body: JSON.stringify({ line_items: validLineItems }),
       }),
       { params: Promise.resolve({ id: RECEIPT_ID }) }
     );

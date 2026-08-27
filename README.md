@@ -80,7 +80,7 @@ Install these **before** you start:
 Grocery-Management-Project/
 ├── web/                    # Next.js frontend + API route handlers
 ├── ai-service/             # FastAPI OCR / Gemini / reconciliation microservice
-├── supabase/migrations/    # PostgreSQL schema (0001–0009)
+├── supabase/migrations/    # PostgreSQL schema (0001–0010)
 ├── docs/testing/           # TDD & coverage policy
 ├── CHANGELOG.md            # Release history
 └── .cursor/plans/          # Architecture plan (g-rocery-core.md)
@@ -120,7 +120,7 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-> **Reminder:** Migrations exist in the repo but **do nothing until you run `supabase db push`** against your project.
+> **Reminder:** Migrations exist in the repo but **do nothing until you run `supabase db push`** against your project. Migration `0010_increment_inventory_rpc.sql` adds the atomic `increment_inventory_quantity` RPC used by receipt approval — deploy it before running the ai-service in production.
 
 ### 3. Set up Google Cloud (OCR)
 

@@ -3,6 +3,7 @@
 import { autoToBuyQuantity, shouldCreateAutoToBuyEntry } from "@/lib/inventory/auto-to-buy";
 import { getHouseholdIdForUser } from "@/lib/household/get-household-id";
 import { supabaseServer } from "@/lib/supabase/server";
+import { createToBuyEntry } from "@/lib/to-buy/create-to-buy-entry";
 import type { InventoryItem, PriorityLevel } from "@/lib/types/database.types";
 
 export type InventoryActionResult = { error?: string };
@@ -28,13 +29,15 @@ async function maybeCreateAutoToBuyEntry(
   }
 
   const quantityRequested = autoToBuyQuantity(item);
-  await supabase.from("to_buy_list").insert({
-    household_id: item.household_id,
-    item_id: item.id,
-    quantity_requested: quantityRequested,
-    quantity_remaining: quantityRequested,
-    status: "OPEN",
+  const result = await createToBuyEntry(supabase, {
+    householdId: item.household_id,
+    itemId: item.id,
+    quantityRequested,
   });
+
+  if (result.error) {
+    console.error("Auto to-buy entry creation failed:", result.error);
+  }
 }
 
 export async function createInventoryItem(formData: FormData): Promise<InventoryActionResult> {

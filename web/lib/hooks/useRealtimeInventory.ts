@@ -1,53 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 
 import { applyInventoryRealtimeEvent } from "@/lib/inventory/apply-realtime-event";
-import { supabaseBrowser } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "@/lib/hooks/useRealtimeSubscription";
 import type { InventoryItem } from "@/lib/types/database.types";
 
-type RealtimePayload = {
-  eventType: "INSERT" | "UPDATE" | "DELETE";
-  new: InventoryItem;
-  old: InventoryItem;
-};
-
 export function useRealtimeInventory(householdId: string, initialItems: InventoryItem[]) {
-  const [items, setItems] = useState(initialItems);
+  const applyEvent = useCallback(
+    (current: InventoryItem[], payload: Parameters<typeof applyInventoryRealtimeEvent>[1]) =>
+      applyInventoryRealtimeEvent(current, payload),
+    []
+  );
 
-  useEffect(() => {
-    setItems(initialItems);
-  }, [initialItems]);
-
-  useEffect(() => {
-    const supabase = supabaseBrowser();
-    const channel = supabase
-      .channel(`inventory:${householdId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "inventory_items",
-          filter: `household_id=eq.${householdId}`,
-        },
-        (payload) => {
-          const realtimePayload = payload as unknown as RealtimePayload;
-          setItems((current) =>
-            applyInventoryRealtimeEvent(current, {
-              eventType: realtimePayload.eventType,
-              new: realtimePayload.new ?? null,
-              old: realtimePayload.old ?? null,
-            })
-          );
-        }
-      )
-      .subscribe();
-
-    return () => {
-      void channel.unsubscribe();
-    };
-  }, [householdId]);
-
-  return items;
+  return useRealtimeSubscription(
+    `inventory:${householdId}`,
+    "inventory_items",
+    householdId,
+    initialItems,
+    applyEvent
+  );
 }

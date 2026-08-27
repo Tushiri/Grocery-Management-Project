@@ -48,6 +48,24 @@ def _line_item_from_gemini(
     )
 
 
+def _process_ocr_line(
+    line: OcrLine,
+    *,
+    household_id: UUID,
+    mapping: ProductMappingService,
+    gemini: GeminiService,
+) -> tuple[ReceiptLineItem, str]:
+    match = mapping.find_exact_match(household_id, line.text)
+    if match is not None:
+        return _line_item_from_mapping(line, match), "lookup"
+
+    normalized = normalize_ocr_string(line.text)
+    extracted = gemini.extract_structured(normalized)
+    item_id = mapping.resolve_or_create_item(household_id, extracted)
+    mapping.persist_mapping(household_id, normalized, item_id)
+    return _line_item_from_gemini(line, extracted, item_id), "gemini"
+
+
 async def process_receipt(
     req: ProcessReceiptRequest,
     *,
@@ -64,18 +82,17 @@ async def process_receipt(
     gemini_hits = 0
 
     for line in raw_lines:
-        match = mapping.find_exact_match(req.household_id, line.text)
-        if match is not None:
-            line_items.append(_line_item_from_mapping(line, match))
+        receipt_line, source = _process_ocr_line(
+            line,
+            household_id=req.household_id,
+            mapping=mapping,
+            gemini=gemini,
+        )
+        line_items.append(receipt_line)
+        if source == "lookup":
             lookup_hits += 1
-            continue
-
-        normalized = normalize_ocr_string(line.text)
-        extracted = gemini.extract_structured(normalized)
-        item_id = mapping.resolve_or_create_item(req.household_id, extracted)
-        mapping.persist_mapping(req.household_id, normalized, item_id)
-        line_items.append(_line_item_from_gemini(line, extracted, item_id))
-        gemini_hits += 1
+        else:
+            gemini_hits += 1
 
     parsed = ParsedReceipt(
         store_name="",

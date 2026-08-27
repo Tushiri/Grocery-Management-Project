@@ -70,6 +70,28 @@ describe("POST /api/receipts", () => {
     expect(response.status).toBe(401);
   });
 
+  it("returns 400 for malformed JSON body", async () => {
+    mockSupabaseServer.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "user-1" } },
+          error: null,
+        }),
+      },
+      from: vi.fn(),
+    });
+
+    const { POST } = await import("../route");
+    const response = await POST(
+      new Request("http://localhost/api/receipts", {
+        method: "POST",
+        body: "{ invalid-json",
+      })
+    );
+
+    expect(response.status).toBe(400);
+  });
+
   it("returns 400 when storagePath does not match household", async () => {
     mockSupabaseServer.mockResolvedValue({
       auth: {

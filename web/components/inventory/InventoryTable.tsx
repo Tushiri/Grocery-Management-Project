@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
 import { createInventoryItem, depleteInventoryItem } from "@/app/actions/inventory";
+import { FormErrorAlert } from "@/components/common/FormErrorAlert";
 import { useRealtimeInventory } from "@/lib/hooks/useRealtimeInventory";
 import type { InventoryItem, PriorityLevel } from "@/lib/types/database.types";
 
@@ -47,11 +48,7 @@ export function InventoryTable({ householdId, initialItems }: InventoryTableProp
 
   return (
     <div className="space-y-6">
-      {error && (
-        <p role="alert" className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      {error && <FormErrorAlert message={error} />}
 
       <form onSubmit={handleAddItem} className="grid gap-3 rounded border border-gray-200 p-4 md:grid-cols-2">
         <h2 className="md:col-span-2 text-lg font-medium">Add inventory item</h2>

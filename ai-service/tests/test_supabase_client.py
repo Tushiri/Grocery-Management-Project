@@ -183,19 +183,21 @@ def test_create_inventory_item_raises_when_insert_returns_invalid_id() -> None:
         client.create_inventory_item(HOUSEHOLD_ID, extracted)
 
 
-def test_insert_product_mapping_inserts_normalized_mapping() -> None:
+def test_insert_product_mapping_upserts_normalized_mapping() -> None:
     sdk = MagicMock()
     chain = MagicMock()
-    chain.insert.return_value = chain
+    chain.upsert.return_value = chain
     chain.execute.return_value = MagicMock(data=[{}])
     sdk.table.return_value = chain
     client = SupabaseServiceClient(sdk)
 
     client.insert_product_mapping(HOUSEHOLD_ID, "ORG MILK", ITEM_ID)
 
-    payload = chain.insert.call_args[0][0]
+    chain.upsert.assert_called_once()
+    payload = chain.upsert.call_args[0][0]
     assert payload["raw_ocr_string"] == "ORG MILK"
     assert payload["standardized_item_id"] == str(ITEM_ID)
+    assert chain.upsert.call_args[1]["on_conflict"] == "household_id,raw_ocr_string"
 
 
 def test_get_pending_receipt_returns_row() -> None:
@@ -213,25 +215,19 @@ def test_get_pending_receipt_returns_row() -> None:
     assert result == {"id": str(RECEIPT_ID), "status": "PENDING"}
 
 
-def test_increment_inventory_quantity_updates_quantity() -> None:
+def test_increment_inventory_quantity_calls_rpc() -> None:
     sdk = MagicMock()
-    select_chain = MagicMock()
-    select_chain.select.return_value = select_chain
-    select_chain.eq.return_value = select_chain
-    select_chain.single.return_value = select_chain
-    select_chain.execute.return_value = MagicMock(data={"quantity": 5})
-
-    update_chain = MagicMock()
-    update_chain.update.return_value = update_chain
-    update_chain.eq.return_value = update_chain
-    update_chain.execute.return_value = MagicMock(data=[{}])
-
-    sdk.table.side_effect = [select_chain, update_chain]
+    rpc_chain = MagicMock()
+    rpc_chain.execute.return_value = MagicMock(data=None)
+    sdk.rpc.return_value = rpc_chain
     client = SupabaseServiceClient(sdk)
 
     client.increment_inventory_quantity(ITEM_ID, 2.0)
 
-    update_chain.update.assert_called_once_with({"quantity": 7.0})
+    sdk.rpc.assert_called_once_with(
+        "increment_inventory_quantity",
+        {"p_item_id": str(ITEM_ID), "p_amount": 2.0},
+    )
 
 
 def test_insert_price_history_inserts_row() -> None:

@@ -7,11 +7,8 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.clients.gemini_client import GeminiClient
+from app.domain.exceptions import GeminiExtractionError
 from app.schemas.receipt import GeminiLineExtraction
-
-
-class GeminiExtractionError(Exception):
-    """Raised when Gemini output cannot be validated against the schema."""
 
 
 class GeminiService:

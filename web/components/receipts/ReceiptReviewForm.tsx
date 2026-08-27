@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { FormErrorAlert } from "@/components/common/FormErrorAlert";
+import { parseJsonError } from "@/lib/http/parse-api-error";
 import type { ParsedReceipt, ReceiptLineItem } from "@/lib/receipts/types";
 
 type ReceiptReviewFormProps = {
@@ -43,20 +45,24 @@ export function ReceiptReviewForm({ pendingReceiptId, parsed, status }: ReceiptR
     setError(null);
     setIsSubmitting(true);
 
-    const response = await fetch(`/api/receipts/${pendingReceiptId}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ line_items: lineItems }),
-    });
+    try {
+      const response = await fetch(`/api/receipts/${pendingReceiptId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ line_items: lineItems }),
+      });
 
-    if (!response.ok) {
-      const body = (await response.json()) as { error?: string };
-      setError(body.error ?? "Approval failed");
+      if (!response.ok) {
+        setError(await parseJsonError(response, "Approval failed"));
+        return;
+      }
+
+      router.push("/inventory");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Approval failed unexpectedly.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    router.push("/inventory");
   }
 
   return (
@@ -67,11 +73,7 @@ export function ReceiptReviewForm({ pendingReceiptId, parsed, status }: ReceiptR
         <p className="text-sm text-gray-600">Purchased: {parsed.date_purchased}</p>
       </div>
 
-      {error && (
-        <div role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <FormErrorAlert message={error} />}
 
       <table className="w-full border-collapse text-sm">
         <thead>

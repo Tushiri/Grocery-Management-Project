@@ -6,6 +6,11 @@ from datetime import date
 from uuid import UUID
 
 from app.clients.supabase_client import SupabaseServiceClient
+from app.domain.exceptions import (
+    InvalidReceiptMetadataError,
+    InvalidReceiptStateError,
+    ReceiptNotFoundError,
+)
 from app.schemas.receipt import (
     ApproveReceiptRequest,
     ApproveReceiptResponse,
@@ -22,26 +27,12 @@ def _to_buy_status(quantity_requested: float, quantity_remaining: float) -> str:
     return "OPEN"
 
 
-def apply_line_item(
+def _apply_to_buy_entries(
     line: ReceiptLineItem,
     *,
     household_id: UUID,
-    store_name: str,
-    date_purchased: date,
     supabase: SupabaseServiceClient,
 ) -> None:
-    if line.matched_item_id is None:
-        return
-
-    supabase.increment_inventory_quantity(line.matched_item_id, line.quantity)
-    supabase.insert_price_history(
-        household_id,
-        line.matched_item_id,
-        line.unit_price,
-        store_name,
-        date_purchased,
-    )
-
     remaining_qty = line.quantity
     for entry in supabase.find_open_or_partial_to_buy(household_id, line.matched_item_id):
         if remaining_qty <= 0:
@@ -64,28 +55,65 @@ def apply_line_item(
         remaining_qty -= applied
 
 
+def apply_line_item(
+    line: ReceiptLineItem,
+    *,
+    household_id: UUID,
+    store_name: str,
+    date_purchased: date,
+    supabase: SupabaseServiceClient,
+) -> None:
+    if line.matched_item_id is None:
+        return
+
+    supabase.increment_inventory_quantity(line.matched_item_id, line.quantity)
+    supabase.insert_price_history(
+        household_id,
+        line.matched_item_id,
+        line.unit_price,
+        store_name,
+        date_purchased,
+    )
+    _apply_to_buy_entries(line, household_id=household_id, supabase=supabase)
+
+
+def _get_pending_or_raise(
+    pending_receipt_id: UUID,
+    *,
+    supabase: SupabaseServiceClient,
+) -> dict[str, object]:
+    pending = supabase.get_pending_receipt(pending_receipt_id)
+    if pending is None:
+        raise ReceiptNotFoundError("Pending receipt not found")
+    return pending
+
+
 def _resolve_receipt_metadata(
     pending: dict[str, object],
 ) -> tuple[str, date, UUID]:
     household_id = pending.get("household_id")
     if not isinstance(household_id, str):
-        raise ValueError("Pending receipt missing household_id")
+        raise InvalidReceiptMetadataError("Pending receipt missing household_id")
+
+    parsed_json = pending.get("parsed_json")
+    parsed_dict = parsed_json if isinstance(parsed_json, dict) else None
 
     store_name = pending.get("store_name")
     if not isinstance(store_name, str) or not store_name:
-        parsed_json = pending.get("parsed_json")
-        if isinstance(parsed_json, dict):
-            parsed_store = parsed_json.get("store_name")
+        if parsed_dict is not None:
+            parsed_store = parsed_dict.get("store_name")
             store_name = parsed_store if isinstance(parsed_store, str) else ""
         else:
             store_name = ""
 
-    parsed_json = pending.get("parsed_json")
     date_purchased = date.today()
-    if isinstance(parsed_json, dict):
-        parsed_date = parsed_json.get("date_purchased")
+    if parsed_dict is not None:
+        parsed_date = parsed_dict.get("date_purchased")
         if isinstance(parsed_date, str):
-            date_purchased = date.fromisoformat(parsed_date)
+            try:
+                date_purchased = date.fromisoformat(parsed_date)
+            except ValueError as exc:
+                raise InvalidReceiptMetadataError("Invalid date_purchased format") from exc
 
     return store_name, date_purchased, UUID(household_id)
 
@@ -96,13 +124,11 @@ async def approve_receipt(
     *,
     supabase: SupabaseServiceClient,
 ) -> ApproveReceiptResponse:
-    pending = supabase.get_pending_receipt(pending_receipt_id)
-    if pending is None:
-        raise ValueError("Pending receipt not found")
+    pending = _get_pending_or_raise(pending_receipt_id, supabase=supabase)
 
     status = pending.get("status")
     if status != "PENDING":
-        raise ValueError("Receipt is not pending approval")
+        raise InvalidReceiptStateError("Receipt is not pending approval")
 
     store_name, date_purchased, household_id = _resolve_receipt_metadata(pending)
 
@@ -124,9 +150,11 @@ async def reject_receipt(
     *,
     supabase: SupabaseServiceClient,
 ) -> RejectReceiptResponse:
-    pending = supabase.get_pending_receipt(pending_receipt_id)
-    if pending is None:
-        raise ValueError("Pending receipt not found")
+    pending = _get_pending_or_raise(pending_receipt_id, supabase=supabase)
+
+    status = pending.get("status")
+    if status != "PENDING":
+        raise InvalidReceiptStateError("Receipt is not pending approval")
 
     supabase.update_pending_receipt_status(pending_receipt_id, "REJECTED")
     return RejectReceiptResponse(pending_receipt_id=pending_receipt_id, status="REJECTED")

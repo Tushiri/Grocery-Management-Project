@@ -240,4 +240,70 @@ describe("ReceiptUploadForm", () => {
     });
     expect(mockUpload).not.toHaveBeenCalled();
   });
+
+  it("resets processing state when fetch throws", async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error("Network down"));
+    const { ReceiptUploadForm } = await import("../ReceiptUploadForm");
+    const user = userEvent.setup();
+    render(<ReceiptUploadForm householdId={HOUSEHOLD_ID} />);
+
+    await user.upload(screen.getByLabelText(/receipt photo/i), createImageFile());
+    await user.click(screen.getByRole("button", { name: /upload receipt/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Network down");
+    });
+    expect(screen.getByRole("button", { name: /upload receipt/i })).toBeEnabled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("shows processing label while waiting for API response", async () => {
+    let resolveFetch: (value: Response) => void = () => undefined;
+    const pendingFetch = new Promise<Response>((resolve) => {
+      resolveFetch = resolve;
+    });
+    vi.mocked(fetch).mockReturnValue(pendingFetch);
+
+    const { ReceiptUploadForm } = await import("../ReceiptUploadForm");
+    const user = userEvent.setup();
+    render(<ReceiptUploadForm householdId={HOUSEHOLD_ID} />);
+
+    await user.upload(screen.getByLabelText(/receipt photo/i), createImageFile());
+    await user.click(screen.getByRole("button", { name: /upload receipt/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /processing/i })).toBeDisabled();
+    });
+
+    resolveFetch(
+      new Response(
+        JSON.stringify({
+          pending_receipt_id: RECEIPT_ID,
+          status: "PENDING",
+          parsed: { store_name: "Test", date_purchased: "2026-08-27", line_items: [] },
+          matched_via_lookup_count: 0,
+          matched_via_gemini_count: 0,
+        }),
+        { status: 200 }
+      )
+    );
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(`/receipts/${RECEIPT_ID}`);
+    });
+  });
+
+  it("shows fallback error when a non-Error is thrown", async () => {
+    vi.mocked(fetch).mockRejectedValue("broken");
+    const { ReceiptUploadForm } = await import("../ReceiptUploadForm");
+    const user = userEvent.setup();
+    render(<ReceiptUploadForm householdId={HOUSEHOLD_ID} />);
+
+    await user.upload(screen.getByLabelText(/receipt photo/i), createImageFile());
+    await user.click(screen.getByRole("button", { name: /upload receipt/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Upload failed unexpectedly.");
+    });
+  });
 });

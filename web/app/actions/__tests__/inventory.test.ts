@@ -178,6 +178,38 @@ describe("inventory server actions", () => {
     });
   });
 
+  it("logs when auto to-buy insert fails", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const toBuyMock = {
+      ...mockToBuyLookup(null),
+      insert: vi.fn().mockResolvedValue({ error: { message: "insert failed" } }),
+    };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "inventory_items") {
+        return mockInventoryInsert({
+          data: { ...inventoryItem, quantity: 0, min_threshold: 5 },
+          error: null,
+        });
+      }
+      return toBuyMock;
+    });
+
+    const { createInventoryItem } = await import("../inventory");
+    const formData = new FormData();
+    formData.set("standardized_name", "Milk");
+    formData.set("unit_type", "L");
+    formData.set("quantity", "0");
+    formData.set("min_threshold", "5");
+    formData.set("priority_tag", "HIGH");
+
+    await expect(createInventoryItem(formData)).resolves.toEqual({});
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Auto to-buy entry creation failed:",
+      "insert failed"
+    );
+    consoleSpy.mockRestore();
+  });
+
   it("skips auto to-buy when an open entry already exists", async () => {
     const toBuyMock = mockToBuyLookup({ id: "buy-1" });
     mockFrom.mockImplementation((table: string) => {

@@ -254,10 +254,10 @@ def test_approve_receipt_endpoint_returns_400_for_invalid_receipt() -> None:
     finally:
         app.dependency_overrides.clear()
 
-    assert response.status_code == 400
+    assert response.status_code == 404
 
 
-def test_reject_receipt_endpoint_returns_400_for_invalid_receipt() -> None:
+def test_reject_receipt_endpoint_returns_404_for_invalid_receipt() -> None:
     supabase = MagicMock()
     supabase.get_pending_receipt.return_value = None
     app.dependency_overrides[get_supabase_service_client] = lambda: supabase
@@ -271,4 +271,34 @@ def test_reject_receipt_endpoint_returns_400_for_invalid_receipt() -> None:
     finally:
         app.dependency_overrides.clear()
 
-    assert response.status_code == 400
+    assert response.status_code == 404
+
+
+def test_process_receipt_endpoint_maps_storage_errors() -> None:
+    from app.domain.exceptions import ReceiptNotFoundError
+
+    supabase = MagicMock()
+    supabase.download_storage.side_effect = ReceiptNotFoundError("image missing")
+    app.dependency_overrides[get_supabase_service_client] = lambda: supabase
+    app.dependency_overrides[get_ocr_service] = lambda: MagicMock(spec=OcrService)
+    app.dependency_overrides[get_product_mapping_service] = lambda: MagicMock(
+        spec=ProductMappingService
+    )
+    app.dependency_overrides[get_gemini_service] = lambda: MagicMock(spec=GeminiService)
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/process-receipt",
+            headers={"X-Service-Token": "test-service-token"},
+            json={
+                "pending_receipt_id": str(RECEIPT_ID),
+                "household_id": str(HOUSEHOLD_ID),
+                "storage_path": f"{HOUSEHOLD_ID}/receipt.jpg",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "image missing"

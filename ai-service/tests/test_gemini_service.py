@@ -7,7 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.schemas.receipt import GeminiLineExtraction
-from app.services.gemini_service import GeminiExtractionError, GeminiService
+from app.domain.exceptions import GeminiExtractionError
+from app.services.gemini_service import GeminiService
 
 
 def test_extract_structured_returns_validated_gemini_line_extraction() -> None:

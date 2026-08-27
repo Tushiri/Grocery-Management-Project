@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 
+import {
+  isNextResponse,
+  parseJsonBody,
+  requireAuthenticatedUser,
+} from "@/lib/api/require-authenticated-user";
 import { processReceipt } from "@/lib/ai-service-client";
 import { getHouseholdIdForUser } from "@/lib/household/get-household-id";
-import { supabaseServer } from "@/lib/supabase/server";
 
 type CreateReceiptBody = {
   storagePath?: string;
@@ -10,14 +14,16 @@ type CreateReceiptBody = {
 };
 
 export async function POST(req: Request) {
-  const supabase = await supabaseServer();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !userData.user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireAuthenticatedUser();
+  if (isNextResponse(auth)) {
+    return auth;
   }
 
-  const body = (await req.json()) as CreateReceiptBody;
+  const body = await parseJsonBody<CreateReceiptBody>(req);
+  if (isNextResponse(body)) {
+    return body;
+  }
+
   const storagePath = body.storagePath?.trim();
   const storeName = body.storeName?.trim() ?? "";
 
@@ -37,7 +43,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid storage path for household" }, { status: 400 });
   }
 
-  const { data: pendingReceipt, error: insertError } = await supabase
+  const { data: pendingReceipt, error: insertError } = await auth.supabase
     .from("pending_receipt")
     .insert({
       household_id: householdId,

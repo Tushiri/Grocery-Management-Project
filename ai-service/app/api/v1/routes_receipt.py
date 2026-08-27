@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
 from app.api.v1.deps import (
     get_gemini_service,
@@ -13,6 +13,7 @@ from app.api.v1.deps import (
     get_product_mapping_service,
     get_supabase_service_client,
 )
+from app.api.v1.error_handlers import map_receipt_exception
 from app.clients.supabase_client import SupabaseServiceClient
 from app.core.security import verify_service_token
 from app.schemas.receipt import (
@@ -39,13 +40,16 @@ async def process_receipt_endpoint(
     mapping: Annotated[ProductMappingService, Depends(get_product_mapping_service)],
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
 ) -> ProcessReceiptResponse:
-    return await process_receipt(
-        req,
-        supabase=supabase,
-        ocr=ocr,
-        mapping=mapping,
-        gemini=gemini,
-    )
+    try:
+        return await process_receipt(
+            req,
+            supabase=supabase,
+            ocr=ocr,
+            mapping=mapping,
+            gemini=gemini,
+        )
+    except Exception as exc:
+        raise map_receipt_exception(exc) from exc
 
 
 @router.post(
@@ -59,8 +63,8 @@ async def approve_receipt_endpoint(
 ) -> ApproveReceiptResponse:
     try:
         return await approve_receipt(pending_receipt_id, req, supabase=supabase)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise map_receipt_exception(exc) from exc
 
 
 @router.post(
@@ -73,5 +77,5 @@ async def reject_receipt_endpoint(
 ) -> RejectReceiptResponse:
     try:
         return await reject_receipt(pending_receipt_id, supabase=supabase)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise map_receipt_exception(exc) from exc

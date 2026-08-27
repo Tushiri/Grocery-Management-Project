@@ -8,6 +8,7 @@ from uuid import UUID
 
 from app.clients.supabase_client import SupabaseServiceClient
 from app.core.text_utils import normalize_ocr_string
+from app.domain.exceptions import InvalidInventoryDataError
 from app.schemas.receipt import GeminiLineExtraction
 
 
@@ -62,6 +63,7 @@ class ProductMappingService:
             item_id = existing.get("id")
             if isinstance(item_id, str):
                 return UUID(item_id)
+            raise InvalidInventoryDataError("Existing inventory item has invalid id")
         return self._repository.create_inventory_item(household_id, extracted)
 
     def persist_mapping(

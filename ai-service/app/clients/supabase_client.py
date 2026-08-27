@@ -92,12 +92,13 @@ class SupabaseServiceClient:
     ) -> None:
         (
             self._client.table("product_mapping")
-            .insert(
+            .upsert(
                 {
                     "household_id": str(household_id),
                     "raw_ocr_string": raw_ocr_string,
                     "standardized_item_id": str(item_id),
-                }
+                },
+                on_conflict="household_id,raw_ocr_string",
             )
             .execute()
         )
@@ -125,19 +126,11 @@ class SupabaseServiceClient:
         return response.data
 
     def increment_inventory_quantity(self, item_id: UUID, amount: float) -> None:
-        current = (
-            self._client.table("inventory_items")
-            .select("quantity")
-            .eq("id", str(item_id))
-            .single()
-            .execute()
-        )
-        quantity = float(current.data["quantity"])
         (
-            self._client.table("inventory_items")
-            .update({"quantity": quantity + amount})
-            .eq("id", str(item_id))
-            .execute()
+            self._client.rpc(
+                "increment_inventory_quantity",
+                {"p_item_id": str(item_id), "p_amount": amount},
+            ).execute()
         )
 
     def insert_price_history(

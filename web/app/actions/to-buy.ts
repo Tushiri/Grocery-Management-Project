@@ -2,6 +2,7 @@
 
 import { getHouseholdIdForUser } from "@/lib/household/get-household-id";
 import { supabaseServer } from "@/lib/supabase/server";
+import { createToBuyEntry } from "@/lib/to-buy/create-to-buy-entry";
 
 export type ToBuyActionResult = { error?: string };
 
@@ -31,19 +32,11 @@ export async function addToBuyListEntry(formData: FormData): Promise<ToBuyAction
       return { error: "Inventory item not found in your household." };
     }
 
-    const { error } = await supabase.from("to_buy_list").insert({
-      household_id: householdId,
-      item_id: itemId,
-      quantity_requested: quantityRequested,
-      quantity_remaining: quantityRequested,
-      status: "OPEN",
+    return createToBuyEntry(supabase, {
+      householdId,
+      itemId,
+      quantityRequested,
     });
-
-    if (error) {
-      return { error: error.message };
-    }
-
-    return {};
   } catch (cause) {
     return { error: cause instanceof Error ? cause.message : "Could not add to-buy entry." };
   }

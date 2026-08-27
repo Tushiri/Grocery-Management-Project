@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent, type FormEvent } from "react";
 
+import { FormErrorAlert } from "@/components/common/FormErrorAlert";
+import { parseJsonError } from "@/lib/http/parse-api-error";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -60,33 +62,36 @@ export function ReceiptUploadForm({ householdId }: ReceiptUploadFormProps) {
 
     setUploadState("uploading");
 
-    const { error: uploadError } = await supabaseBrowser()
-      .storage.from("receipts")
-      .upload(storagePath, selectedFile, { upsert: false });
+    try {
+      const { error: uploadError } = await supabaseBrowser()
+        .storage.from("receipts")
+        .upload(storagePath, selectedFile, { upsert: false });
 
-    if (uploadError) {
-      setError(uploadError.message);
+      if (uploadError) {
+        setError(uploadError.message);
+        return;
+      }
+
+      setUploadState("processing");
+
+      const response = await fetch("/api/receipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storagePath, storeName: storeName.trim() }),
+      });
+
+      if (!response.ok) {
+        setError(await parseJsonError(response, "Processing failed"));
+        return;
+      }
+
+      const body = (await response.json()) as { pending_receipt_id: string };
+      router.push(`/receipts/${body.pending_receipt_id}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Upload failed unexpectedly.");
+    } finally {
       setUploadState("idle");
-      return;
     }
-
-    setUploadState("processing");
-
-    const response = await fetch("/api/receipts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ storagePath, storeName: storeName.trim() }),
-    });
-
-    if (!response.ok) {
-      const body = (await response.json()) as { error?: string };
-      setError(body.error ?? "Processing failed");
-      setUploadState("idle");
-      return;
-    }
-
-    const body = (await response.json()) as { pending_receipt_id: string };
-    router.push(`/receipts/${body.pending_receipt_id}`);
   }
 
   const isBusy = uploadState !== "idle";
@@ -99,11 +104,7 @@ export function ReceiptUploadForm({ householdId }: ReceiptUploadFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="max-w-md space-y-4">
-      {error && (
-        <div role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <FormErrorAlert message={error} />}
 
       <div>
         <label htmlFor="store-name" className="mb-1 block text-sm font-medium">

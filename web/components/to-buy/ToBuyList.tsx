@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { addToBuyListEntry } from "@/app/actions/to-buy";
+import { FormErrorAlert } from "@/components/common/FormErrorAlert";
 import { useToBuyList } from "@/lib/hooks/useToBuyList";
 import { filterToBuyByStatus } from "@/lib/to-buy/apply-realtime-event";
 import type { InventoryItem, ToBuyListEntryWithItem, ToBuyStatus } from "@/lib/types/database.types";
@@ -47,11 +48,7 @@ export function ToBuyList({ householdId, initialEntries, inventoryItems }: ToBuy
 
   return (
     <div className="space-y-6">
-      {error && (
-        <p role="alert" className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      {error && <FormErrorAlert message={error} />}
 
       <div className="flex flex-wrap gap-2">
         {STATUS_FILTERS.map((status) => (

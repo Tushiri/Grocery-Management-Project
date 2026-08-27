@@ -5,6 +5,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 from uuid import UUID
 
+import pytest
+
 from app.core.text_utils import normalize_ocr_string
 from app.services.product_mapping_service import ProductMappingMatch, ProductMappingService
 
@@ -132,12 +134,12 @@ def test_persist_mapping_normalizes_raw_ocr_string() -> None:
     supabase.insert_product_mapping.assert_called_once_with(HOUSEHOLD_ID, "ORG MILK", ITEM_ID)
 
 
-def test_resolve_or_create_item_creates_when_existing_row_has_invalid_id() -> None:
+def test_resolve_or_create_item_raises_when_existing_row_has_invalid_id() -> None:
+    from app.domain.exceptions import InvalidInventoryDataError
     from app.schemas.receipt import GeminiLineExtraction
 
     supabase = MagicMock()
     supabase.find_inventory_item_by_name.return_value = {"id": 123}
-    supabase.create_inventory_item.return_value = ITEM_ID
     service = ProductMappingService(supabase)
     extracted = GeminiLineExtraction(
         standardized_name="Organic Milk",
@@ -146,7 +148,7 @@ def test_resolve_or_create_item_creates_when_existing_row_has_invalid_id() -> No
         total_price=3.0,
     )
 
-    item_id = service.resolve_or_create_item(HOUSEHOLD_ID, extracted)
+    with pytest.raises(InvalidInventoryDataError, match="invalid id"):
+        service.resolve_or_create_item(HOUSEHOLD_ID, extracted)
 
-    assert item_id == ITEM_ID
-    supabase.create_inventory_item.assert_called_once()
+    supabase.create_inventory_item.assert_not_called()

@@ -5,6 +5,7 @@ out/
 dist/
 build/
 .turbo/
+.tools/
 *.tsbuildinfo
 npm-debug.log*
 pnpm-debug.log*
@@ -21,6 +22,8 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+coverage/
+.web/coverage/
 
 # --- Env / secrets (never commit real values) ---
 .env

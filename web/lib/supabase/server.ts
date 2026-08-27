@@ -1,7 +1,10 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 import type { Database } from "@/lib/types/database.types";
+
+export type TypedSupabaseClient = SupabaseClient<Database>;
 
 /**
  * Server-side Supabase client for Server Components, Server Actions, and
@@ -9,7 +12,7 @@ import type { Database } from "@/lib/types/database.types";
  *
  * `cookies()` is async in the Next.js App Router — callers must `await` this.
  */
-export async function supabaseServer() {
+export async function supabaseServer(): Promise<TypedSupabaseClient> {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -33,5 +36,5 @@ export async function supabaseServer() {
         },
       },
     }
-  );
+  ) as TypedSupabaseClient;
 }

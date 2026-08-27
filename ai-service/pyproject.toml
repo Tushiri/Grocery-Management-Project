@@ -1,6 +1,6 @@
 [project]
 name = "ai-service"
-version = "0.1.0"
+version = "0.4.0"
 description = "G-rocery AI microservice — Cloud Vision OCR + Gemini 2.5 Flash receipt processing pipeline."
 requires-python = ">=3.12"
 dependencies = [
@@ -8,6 +8,9 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "pydantic-settings>=2.4.0",
     "httpx>=0.27.0",
+    "google-cloud-vision>=3.7.0",
+    "google-genai>=1.0.0",
+    "supabase>=2.10.0",
 ]
 
 # PEP 735 dependency groups (uv-native support). Populated in later phases:
@@ -16,6 +19,8 @@ dependencies = [
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.27.0",
     "ruff>=0.6.0",
     "mypy>=1.11.0",
 ]
@@ -43,3 +48,24 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["."]
+addopts = "-ra --strict-markers --cov=app --cov-report=term-missing --cov-fail-under=100"
+markers = [
+    "asyncio: mark a test as async (pytest-asyncio)",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+]

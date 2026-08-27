@@ -1,8 +1,14 @@
+const withPWA = require("@ducanh2912/next-pwa").default({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development",
+  register: true,
+  skipWaiting: true,
+});
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // PWA support (manifest + service worker via next-pwa or a hand-rolled
-  // service worker) is added in Phase 9 per .cursor/plans/g-rocery-core.md §10.
+  productionBrowserSourceMaps: false,
 };
 
-module.exports = nextConfig;
+module.exports = withPWA(nextConfig);

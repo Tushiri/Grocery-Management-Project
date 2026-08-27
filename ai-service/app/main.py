@@ -4,16 +4,18 @@ Isolated AI pipeline: Cloud Vision OCR + Gemini 2.5 Flash receipt processing.
 See .cursor/plans/g-rocery-core.md §5 for the full service design.
 """
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from pydantic import BaseModel
 
-from app.core.security import verify_service_token
+from app.api.v1.routes_receipt import router as receipt_router
 
 app = FastAPI(
     title="G-rocery AI Service",
     description="Isolated AI pipeline: Cloud Vision OCR + Gemini 2.5 Flash receipt processing.",
-    version="0.1.0",
+    version="0.2.0",
 )
+
+app.include_router(receipt_router)
 
 
 class HealthResponse(BaseModel):
@@ -31,29 +33,3 @@ async def health_check() -> HealthResponse:
     readiness probes to pass before the rest of the config is wired up.
     """
     return HealthResponse(status="ok", service="ai-service")
-
-
-class PingResponse(BaseModel):
-    status: str
-
-
-@app.get(
-    "/api/ping",
-    response_model=PingResponse,
-    tags=["ops"],
-    dependencies=[Depends(verify_service_token)],
-)
-async def ping() -> PingResponse:
-    """Phase 4 smoke-test endpoint: proves `verify_service_token` rejects
-    unauthenticated callers (401) and accepts a valid X-Service-Token.
-
-    Temporary — superseded by the real protected routes
-    (/api/process-receipt and friends) in Phase 5/6, at which point this
-    endpoint should be removed.
-    """
-    return PingResponse(status="authenticated")
-
-
-# NOTE: /api/process-receipt and /api/process-receipt/{id}/approve|reject
-# routers (protected by `verify_service_token`) are wired in Phase 5/6 once
-# the OCR + Gemini pipeline services exist — see g-rocery-core.md §5.5.
